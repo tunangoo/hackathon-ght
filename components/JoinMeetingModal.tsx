@@ -15,11 +15,11 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/lib/auth-context"
 
 // Zod schema for join meeting form validation
 const joinMeetingSchema = z.object({
   zoomId: z.string().min(1, "Zoom ID is required"),
-  username: z.string().min(1, "Username is required"),
 })
 
 type JoinMeetingFormData = z.infer<typeof joinMeetingSchema>
@@ -31,6 +31,7 @@ interface JoinMeetingModalProps {
 
 export default function JoinMeetingModal({ isOpen, onClose }: JoinMeetingModalProps) {
   const router = useRouter()
+  const { user } = useAuth()
   const {
     register,
     handleSubmit,
@@ -44,10 +45,13 @@ export default function JoinMeetingModal({ isOpen, onClose }: JoinMeetingModalPr
     console.log("Join meeting data:", data)
     console.log("🚀 Joining meeting and starting call automatically...")
     
+    // Use authenticated user's username
+    const username = user?.username || "Anonymous"
+    
     // Navigate to the WebRTC call page with meeting info
     const params = new URLSearchParams({
       zoomId: data.zoomId,
-      username: data.username
+      username: username
     })
     router.push(`/call?${params.toString()}`)
     reset()
@@ -65,7 +69,7 @@ export default function JoinMeetingModal({ isOpen, onClose }: JoinMeetingModalPr
         <DialogHeader>
           <DialogTitle>Join Meeting</DialogTitle>
           <DialogDescription>
-            Enter the Zoom meeting ID and your username to join the meeting.
+            Enter the Zoom meeting ID to join the meeting as {user?.username || "Anonymous"}.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)}>
@@ -82,18 +86,19 @@ export default function JoinMeetingModal({ isOpen, onClose }: JoinMeetingModalPr
                 <p className="text-sm text-red-500">{errors.zoomId.message}</p>
               )}
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="username">Your Name</Label>
-              <Input
-                id="username"
-                placeholder="John Doe"
-                {...register("username")}
-                className={errors.username ? "border-red-500" : ""}
-              />
-              {errors.username && (
-                <p className="text-sm text-red-500">{errors.username.message}</p>
-              )}
-            </div>
+            
+            {/* User Info Display */}
+            {user && (
+              <div className="grid gap-2">
+                <Label>Joining as</Label>
+                <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                  <div className="w-6 h-6 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-xs font-medium">
+                    {user.avatar || user.username.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-sm font-medium">{user.username}</span>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose}>

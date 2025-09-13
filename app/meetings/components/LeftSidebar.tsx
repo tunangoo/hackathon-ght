@@ -14,10 +14,14 @@ import {
   Search, 
   Calendar,
   Plus,
-  Video
+  Video,
+  LogOut,
+  User
 } from "lucide-react";
 import { useState } from "react";
 import JoinMeetingModal from "@/components/JoinMeetingModal";
+import { useAuth } from "@/lib/auth-context";
+import { useRouter } from "next/navigation";
 
 const meetings = [
   {
@@ -72,17 +76,50 @@ const meetings = [
 
 export default function LeftSidebar() {
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    logout();
+    router.push("/");
+  };
 
   return (
     <div className="w-80 border-r border-gray-200 flex flex-col h-full">
       {/* Header */}
       <div className="p-6 border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-purple-600 rounded flex items-center justify-center">
-            <span className="text-white font-bold text-sm">Q</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-purple-600 rounded flex items-center justify-center">
+              <span className="text-white font-bold text-sm">Q</span>
+            </div>
+            <h1 className="text-xl font-semibold">Meetings</h1>
           </div>
-          <h1 className="text-xl font-semibold">Meetings</h1>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleLogout}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <LogOut className="w-4 h-4" />
+          </Button>
         </div>
+        
+        {/* User Info */}
+        {user && (
+          <div className="mt-4 flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+            <Avatar className="w-8 h-8">
+              <AvatarFallback className="bg-purple-100 text-purple-700">
+                {user.avatar || user.username.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">
+                {user.username}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <Separator />
