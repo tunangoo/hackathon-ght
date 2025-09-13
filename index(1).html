@@ -1,0 +1,1919 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>WebRTC Video Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen">
+  <div class="container mx-auto p-6">
+    <h1 class="text-3xl font-bold text-center mb-8 text-gray-800">WebRTC Video Call Demo</h1>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div class="bg-white rounded-lg shadow-lg p-4">
+        <h2 class="text-xl font-semibold mb-4 text-gray-700">Local Video</h2>
+        <video id="localVideo" autoplay muted playsinline class="w-full rounded-lg bg-gray-200"></video>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-lg p-4">
+        <h2 class="text-xl font-semibold mb-4 text-gray-700">Remote Video</h2>
+        <video id="remoteVideo" autoplay playsinline class="w-full rounded-lg bg-gray-200"></video>
+      </div>
+    </div>
+
+    <!-- Hidden canvas for recording composite video -->
+    <canvas id="recordingCanvas" style="display: none;" width="1280" height="720"></canvas>
+
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+      <div class="flex flex-wrap gap-4 mb-4">
+        <input type="text" id="userNameInput" placeholder="Enter your name" value=""
+          class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <input type="text" id="roomInput" placeholder="Enter room ID" value="room123"
+          class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button onclick="checkDevices()" id="checkDevicesBtn"
+          class="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors">
+          Check Devices
+        </button>
+        <button onclick="testWebRTC()" id="testWebRTCBtn"
+          class="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
+          Test WebRTC
+        </button>
+        <button onclick="testConnection()" id="testConnectionBtn"
+          class="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors">
+          Test Network
+        </button>
+        <button onclick="testMediaPermissions()" id="testMediaBtn"
+          class="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors">
+          Test Media
+        </button>
+        <button onclick="testCanvas()" id="testCanvasBtn"
+          class="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors">
+          🎨 Test Canvas
+        </button>
+        <button onclick="testDirectRecording()" id="testDirectBtn"
+          class="px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors">
+          🎥 Test Direct
+        </button>
+        <button onclick="testLocalDownload()" id="testLocalBtn"
+          class="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors">
+          💾 Test Local
+        </button>
+        <button onclick="joinRoom()" id="joinBtn"
+          class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+          Join Room
+        </button>
+        <button onclick="startCall()" id="callBtn" disabled
+          class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
+          Start Call
+        </button>
+        <button onclick="startRecording()" id="recordBtn" disabled
+          class="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
+          🔴 Start Recording
+        </button>
+        <button onclick="stopRecording()" id="stopRecordBtn" disabled
+          class="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
+          ⏹️ Stop Recording
+        </button>
+        <button onclick="hangUp()" id="hangupBtn" disabled
+          class="px-6 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
+          Hang Up
+        </button>
+      </div>
+
+      <div class="text-sm text-gray-600">
+        <span>Status: </span>
+        <span id="status" class="font-semibold">Disconnected</span>
+        <span class="ml-4">Recording: </span>
+        <span id="recordingStatus" class="font-semibold text-red-500">⏹️ Not Recording</span>
+        <span id="recordingTimer" class="ml-2 font-mono text-blue-600"></span>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-lg p-4 mb-6">
+      <h3 class="text-lg font-semibold mb-2 text-gray-700">Access URLs</h3>
+      <div class="bg-gray-50 p-4 rounded-lg text-sm">
+        <div class="mb-2">
+          <strong>On this computer:</strong><br>
+          HTTPS: <a href="https://localhost:8443" class="text-blue-600 hover:underline">https://localhost:8443</a><br>
+          HTTP: <a href="http://localhost:8080" class="text-blue-600 hover:underline">http://localhost:8080</a>
+        </div>
+        <div>
+          <strong>On mobile/other devices (same WiFi):</strong><br>
+          <div class="mt-1">
+            <div class="text-green-600 font-mono text-xs bg-green-50 p-2 rounded border">
+              📱 Try these URLs:<br>
+              <strong>http://192.168.110.31:8080</strong><br>
+              <strong>http://192.168.0.129:8080</strong><br>
+              <span class="text-gray-500">https://192.168.110.31:8443</span><br>
+              <span class="text-gray-500">https://192.168.0.129:8443</span>
+            </div>
+            <div class="text-yellow-600 text-xs mt-2">
+              💡 Try both IP addresses - your Mac has multiple network interfaces
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-lg p-4">
+      <h3 class="text-lg font-semibold mb-2 text-gray-700">Log</h3>
+      <pre id="log" class="bg-gray-50 p-4 rounded-lg text-sm overflow-y-auto max-h-64"></pre>
+    </div>
+  </div>
+
+  <script>
+    let ws = null;
+    let peerConnections = new Map(); // clientId -> RTCPeerConnection
+    let localStream = null;
+    let currentRoom = null;
+    let myClientId = null;
+    let userName = null;
+    let otherClients = [];
+    let isConnected = false;
+
+    // Recording variables
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let isRecording = false;
+    let recordingStartTime = null;
+    let recordingTimer = null;
+    let recordingCanvas = null;
+    let recordingContext = null;
+    let recordingAnimationFrame = null;
+    let compositeStream = null;
+
+    const log = (msg) => {
+      const timestamp = new Date().toLocaleTimeString();
+      document.getElementById("log").textContent += `[${timestamp}] ${msg}\n`;
+      document.getElementById("log").scrollTop = document.getElementById("log").scrollHeight;
+    };
+
+    const updateStatus = (status) => {
+      document.getElementById("status").textContent = status;
+    };
+
+    const updateButtons = () => {
+      document.getElementById("joinBtn").disabled = isConnected;
+      document.getElementById("callBtn").disabled = !isConnected;
+      document.getElementById("hangupBtn").disabled = !isConnected;
+
+      const recordBtn = document.getElementById("recordBtn");
+      const stopRecordBtn = document.getElementById("stopRecordBtn");
+
+      if (localStream && isConnected) {
+        recordBtn.disabled = isRecording;
+        stopRecordBtn.disabled = !isRecording;
+      } else {
+        recordBtn.disabled = true;
+        stopRecordBtn.disabled = true;
+      }
+    };
+
+    const updateRecordingStatus = (status, showTimer = false) => {
+      document.getElementById("recordingStatus").textContent = status;
+      if (showTimer && isRecording) {
+        updateRecordingTimer();
+      } else {
+        document.getElementById("recordingTimer").textContent = "";
+      }
+    };
+
+    const updateRecordingTimer = () => {
+      if (!isRecording || !recordingStartTime) return;
+
+      const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+      const minutes = Math.floor(elapsed / 60);
+      const seconds = elapsed % 60;
+      document.getElementById("recordingTimer").textContent =
+        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    };
+
+    // Detect browser and capabilities
+    function detectBrowserCapabilities() {
+      const userAgent = navigator.userAgent.toLowerCase();
+      const capabilities = {
+        browser: 'unknown',
+        version: 'unknown',
+        webrtc: false,
+        getUserMedia: false,
+        secureContext: window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '192.168.110.31'
+      };
+
+      // Detect browser
+      if (userAgent.includes('chrome') && !userAgent.includes('edge')) {
+        capabilities.browser = 'chrome';
+        const match = userAgent.match(/chrome\/(\d+)/);
+        capabilities.version = match ? match[1] : 'unknown';
+      } else if (userAgent.includes('firefox')) {
+        capabilities.browser = 'firefox';
+        const match = userAgent.match(/firefox\/(\d+)/);
+        capabilities.version = match ? match[1] : 'unknown';
+      } else if (userAgent.includes('safari') && !userAgent.includes('chrome')) {
+        capabilities.browser = 'safari';
+        const match = userAgent.match(/version\/(\d+)/);
+        capabilities.version = match ? match[1] : 'unknown';
+      } else if (userAgent.includes('edge')) {
+        capabilities.browser = 'edge';
+        const match = userAgent.match(/edge\/(\d+)/);
+        capabilities.version = match ? match[1] : 'unknown';
+      }
+
+      // Check WebRTC support
+      capabilities.webrtc = typeof RTCPeerConnection !== 'undefined' ||
+        typeof webkitRTCPeerConnection !== 'undefined' ||
+        typeof mozRTCPeerConnection !== 'undefined';
+
+      // Check getUserMedia support
+      capabilities.getUserMedia = !!(navigator.mediaDevices?.getUserMedia ||
+        navigator.getUserMedia ||
+        navigator.webkitGetUserMedia ||
+        navigator.mozGetUserMedia ||
+        navigator.msGetUserMedia);
+
+      return capabilities;
+    }
+
+    // Khởi tạo WebRTC PeerConnection cho specific client
+    async function createPeerConnection(clientId) {
+      if (peerConnections.has(clientId)) {
+        log(`⚠️ Peer connection for ${clientId} already exists`);
+        return peerConnections.get(clientId);
+      }
+      // More STUN servers for better mobile compatibility
+      const iceServers = [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:stun3.l.google.com:19302" },
+        { urls: "stun:stun4.l.google.com:19302" }
+      ];
+
+      // Detect if mobile browser
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+      const config = {
+        iceServers: iceServers,
+        iceCandidatePoolSize: 10
+      };
+
+      // Add mobile-specific config
+      if (isMobile) {
+        config.bundlePolicy = "balanced";
+        config.rtcpMuxPolicy = "require";
+        log("Mobile browser detected - using optimized config");
+      }
+
+      const pc = new RTCPeerConnection(config);
+
+      // Xử lý khi nhận được track từ remote peer
+      pc.ontrack = (event) => {
+        log(`Received remote track from ${clientId}: ${event.track.kind}`);
+
+        // Create or update video element for this client
+        let videoElement = document.getElementById(`video-${clientId}`);
+        if (!videoElement) {
+          videoElement = document.createElement('video');
+          videoElement.id = `video-${clientId}`;
+          videoElement.autoplay = true;
+          videoElement.playsinline = true;
+          videoElement.className = 'w-32 h-24 rounded border-2 border-gray-300 bg-gray-200';
+
+          // Add to remote video container
+          const remoteContainer = document.getElementById("remoteVideo").parentElement;
+          remoteContainer.appendChild(videoElement);
+
+          const label = document.createElement('div');
+          label.className = 'text-xs text-center mt-1';
+          label.textContent = `Client: ${clientId}`;
+          remoteContainer.appendChild(label);
+        }
+
+        videoElement.srcObject = event.streams[0];
+      };
+
+      // Xử lý ICE candidates
+      pc.onicecandidate = (event) => {
+        if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: "candidate",
+            candidate: event.candidate.toJSON(),
+            target: clientId,
+            clientId: myClientId
+          }));
+          log(`Sent ICE candidate to ${clientId}`);
+        }
+      };
+
+      // Xử lý connection state changes
+      pc.onconnectionstatechange = () => {
+        log(`Connection state with ${clientId}: ${pc.connectionState}`);
+        if (pc.connectionState === "connected") {
+          updateStatus(`Connected to ${otherClients.length + 1} clients`);
+        } else if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
+          log(`Lost connection to ${clientId}`);
+        }
+      };
+
+      // Thêm local stream tracks vào peer connection
+      if (localStream) {
+        localStream.getTracks().forEach(track => {
+          pc.addTrack(track, localStream);
+        });
+      }
+
+      peerConnections.set(clientId, pc);
+      return pc;
+    }
+
+    // Lấy webcam/mic của browser
+    async function getUserMedia() {
+      try {
+        // Detect browser capabilities
+        const capabilities = detectBrowserCapabilities();
+
+        log("🔍 Browser detection:");
+        log(`  Browser: ${capabilities.browser} ${capabilities.version}`);
+        log(`  WebRTC Support: ${capabilities.webrtc}`);
+        log(`  getUserMedia Support: ${capabilities.getUserMedia}`);
+        log(`  Secure Context: ${capabilities.secureContext}`);
+        log("  Protocol: " + location.protocol);
+        log("  Hostname: " + location.hostname);
+
+        // Check if getUserMedia is supported at all
+        const hasModernAPI = !!navigator.mediaDevices;
+        const hasLegacyAPI = !!(navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
+
+        if (!hasModernAPI && !hasLegacyAPI) {
+          const errorMsg = `❌ getUserMedia is not supported in ${capabilities.browser} ${capabilities.version}.\n\n🔧 Solutions:\n1. Update to latest browser version\n2. Use Chrome 53+, Firefox 36+, Safari 11+, or Edge 79+\n3. Enable WebRTC in browser settings\n4. ${!capabilities.secureContext ? 'Use HTTPS for full support' : 'Check camera/microphone permissions'}`;
+          throw new Error(errorMsg);
+        }
+
+        log(`📱 Browser support: Modern API = ${hasModernAPI}, Legacy API = ${hasLegacyAPI}`);
+
+        // Try to setup mediaDevices if not available
+        if (!navigator.mediaDevices) {
+          log("⚠️ navigator.mediaDevices not available, trying legacy API...");
+
+          // Try older getUserMedia API
+          navigator.getUserMedia = navigator.getUserMedia ||
+            navigator.webkitGetUserMedia ||
+            navigator.mozGetUserMedia ||
+            navigator.msGetUserMedia;
+
+          if (!navigator.getUserMedia) {
+            throw new Error("❌ getUserMedia is not supported in this browser.\n\n🔧 Solutions:\n1. Use HTTPS: https://localhost:8443\n2. Use a modern browser (Chrome, Firefox, Safari, Edge)\n3. Update your browser\n4. Check browser WebRTC settings");
+          }
+
+          // Create mediaDevices polyfill
+          navigator.mediaDevices = {};
+          navigator.mediaDevices.getUserMedia = function (constraints) {
+            return new Promise(function (resolve, reject) {
+              navigator.getUserMedia.call(navigator, constraints, resolve, reject);
+            });
+          };
+
+          log("✅ Created mediaDevices polyfill");
+        }
+
+        if (!navigator.mediaDevices.getUserMedia) {
+          throw new Error("❌ getUserMedia is not supported.\n\n🔧 Solutions:\n1. Use HTTPS: https://localhost:8443\n2. Use a modern browser\n3. Allow camera/microphone permissions\n4. Check if running in secure context");
+        }
+
+        // Additional checks for mobile browsers
+        if (capabilities.browser === 'chrome' && navigator.userAgent.includes('Mobile') && !capabilities.secureContext) {
+          log("⚠️ Chrome mobile requires HTTPS for getUserMedia");
+          throw new Error("❌ Chrome mobile requires HTTPS.\n\n🔧 Solution:\nUse: https://192.168.110.31:8443 or https://192.168.0.129:8443");
+        }
+
+        log("✅ getUserMedia is available");
+
+        // Try to get list of available devices first
+        let devices = [];
+        try {
+          devices = await navigator.mediaDevices.enumerateDevices();
+          log(`Found ${devices.filter(d => d.kind === 'videoinput').length} video devices and ${devices.filter(d => d.kind === 'audioinput').length} audio devices`);
+        } catch (e) {
+          log("Could not enumerate devices: " + e.message);
+        }
+
+        // Try different constraint combinations
+        const constraintOptions = [
+          // Option 1: Both video and audio with ideal settings
+          {
+            video: {
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              facingMode: "user"
+            },
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true
+            }
+          },
+          // Option 2: Basic video and audio
+          { video: true, audio: true },
+          // Option 3: Video only
+          { video: true, audio: false },
+          // Option 4: Audio only  
+          { video: false, audio: true },
+          // Option 5: Low quality video
+          {
+            video: {
+              width: { max: 640 },
+              height: { max: 480 }
+            },
+            audio: true
+          }
+        ];
+
+        let lastError = null;
+
+        for (let i = 0; i < constraintOptions.length; i++) {
+          try {
+            log(`Trying media constraints option ${i + 1}...`);
+            localStream = await navigator.mediaDevices.getUserMedia(constraintOptions[i]);
+
+            document.getElementById("localVideo").srcObject = localStream;
+
+            const videoTracks = localStream.getVideoTracks();
+            const audioTracks = localStream.getAudioTracks();
+
+            log(`Got local media stream: ${videoTracks.length} video track(s), ${audioTracks.length} audio track(s)`);
+
+            if (videoTracks.length > 0) {
+              const settings = videoTracks[0].getSettings();
+              log(`Video: ${settings.width}x${settings.height} @ ${settings.frameRate}fps`);
+            }
+
+            return true;
+          } catch (err) {
+            lastError = err;
+            log(`Option ${i + 1} failed: ${err.message}`);
+            continue;
+          }
+        }
+
+        throw lastError || new Error("All media constraint options failed");
+
+      } catch (err) {
+        log("Error getting user media: " + err.message);
+
+        // Show helpful error messages based on error type
+        if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          log("No camera or microphone found. Please check your devices.");
+        } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          log("Permission denied. Please allow camera/microphone access and refresh the page.");
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+          log("Camera/microphone is already in use by another application.");
+        } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+          log("Camera/microphone constraints could not be satisfied.");
+        } else if (err.name === 'Error' && err.message.includes('WebRTC')) {
+          log("WebRTC compatibility error: " + err.message);
+        } else {
+          log("Unexpected error (" + (err.name || 'Unknown') + "): " + err.message);
+        }
+
+        return false;
+      }
+    }
+
+    // Check available devices
+    async function checkDevices() {
+      try {
+        // Check if we're on HTTPS or localhost
+        const isSecureContext = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '192.168.110.31';
+
+        if (!isSecureContext) {
+          log("⚠️ Device enumeration requires HTTPS or localhost");
+          log("Current URL: " + location.href);
+          log("Try accessing via HTTPS for full device info");
+
+          // Try basic getUserMedia test instead
+          try {
+            log("Testing basic media access...");
+
+            // Setup getUserMedia if not available
+            if (!navigator.mediaDevices) {
+              navigator.getUserMedia = navigator.getUserMedia ||
+                navigator.webkitGetUserMedia ||
+                navigator.mozGetUserMedia ||
+                navigator.msGetUserMedia;
+
+              if (navigator.getUserMedia) {
+                // Create a promise-based wrapper
+                const getUserMediaPromise = function (constraints) {
+                  return new Promise(function (resolve, reject) {
+                    navigator.getUserMedia.call(navigator, constraints, resolve, reject);
+                  });
+                };
+
+                const stream = await getUserMediaPromise({ video: true, audio: true });
+                log("✅ Camera and microphone access works! (legacy API)");
+                stream.getTracks().forEach(track => track.stop());
+              } else {
+                log("❌ No getUserMedia API available in this browser");
+                log("💡 Please use a modern browser like Chrome, Firefox, Safari, or Edge");
+              }
+            } else {
+              const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+              log("✅ Camera and microphone access works!");
+              stream.getTracks().forEach(track => track.stop());
+            }
+          } catch (e) {
+            log("❌ Media access test failed: " + e.message);
+          }
+          return;
+        }
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+          log("⚠️ Device enumeration not supported in this browser");
+          log("Browser: " + navigator.userAgent);
+
+          // Fallback: try getUserMedia test
+          try {
+            log("Testing basic media access...");
+
+            // Setup getUserMedia if not available
+            if (!navigator.mediaDevices) {
+              navigator.getUserMedia = navigator.getUserMedia ||
+                navigator.webkitGetUserMedia ||
+                navigator.mozGetUserMedia ||
+                navigator.msGetUserMedia;
+
+              if (navigator.getUserMedia) {
+                // Create a promise-based wrapper
+                const getUserMediaPromise = function (constraints) {
+                  return new Promise(function (resolve, reject) {
+                    navigator.getUserMedia.call(navigator, constraints, resolve, reject);
+                  });
+                };
+
+                const stream = await getUserMediaPromise({ video: true, audio: true });
+                log("✅ Camera and microphone access works! (legacy API)");
+                stream.getTracks().forEach(track => track.stop());
+              } else {
+                log("❌ No getUserMedia API available");
+              }
+            } else {
+              const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+              log("✅ Camera and microphone access works!");
+              stream.getTracks().forEach(track => track.stop());
+            }
+          } catch (e) {
+            log("❌ Media access test failed: " + e.message);
+          }
+          return;
+        }
+
+        log("Checking available devices...");
+
+        // First request permissions to get device labels
+        let permissionStream = null;
+        try {
+          permissionStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          log("✅ Got permissions for device enumeration");
+        } catch (e) {
+          log("⚠️ Limited device info (no permissions): " + e.message);
+        }
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+
+        if (permissionStream) {
+          permissionStream.getTracks().forEach(track => track.stop());
+        }
+
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        const audioDevices = devices.filter(device => device.kind === 'audioinput');
+
+        log(`📹 Video devices (${videoDevices.length}):`);
+        if (videoDevices.length === 0) {
+          log("  No video devices found");
+        } else {
+          videoDevices.forEach((device, index) => {
+            const label = device.label || `Camera ${index + 1}`;
+            const id = device.deviceId ? device.deviceId.substring(0, 8) + '...' : 'unknown';
+            log(`  ${index + 1}. ${label} (${id})`);
+          });
+        }
+
+        log(`🎤 Audio devices (${audioDevices.length}):`);
+        if (audioDevices.length === 0) {
+          log("  No audio devices found");
+        } else {
+          audioDevices.forEach((device, index) => {
+            const label = device.label || `Microphone ${index + 1}`;
+            const id = device.deviceId ? device.deviceId.substring(0, 8) + '...' : 'unknown';
+            log(`  ${index + 1}. ${label} (${id})`);
+          });
+        }
+
+        // Summary
+        if (videoDevices.length === 0 && audioDevices.length === 0) {
+          log("⚠️ No camera or microphone devices found!");
+        } else if (videoDevices.length === 0) {
+          log("⚠️ No camera devices found - audio-only mode available");
+        } else if (audioDevices.length === 0) {
+          log("⚠️ No microphone devices found - video-only mode available");
+        } else {
+          log("✅ Both video and audio devices are available");
+        }
+
+      } catch (err) {
+        log("❌ Error checking devices: " + err.message);
+        log("💡 Troubleshooting tips:");
+        log("  1. Use HTTPS instead of HTTP");
+        log("  2. Grant camera/microphone permissions");
+        log("  3. Try a different browser (Chrome/Firefox/Safari)");
+        log("  4. Check if devices are being used by other apps");
+      }
+    }
+
+    // Join room
+    async function joinRoom() {
+      const roomId = document.getElementById("roomInput").value.trim();
+      const userNameValue = document.getElementById("userNameInput").value.trim();
+
+      if (!roomId) {
+        alert("Please enter a room ID");
+        return;
+      }
+
+      if (!userNameValue) {
+        alert("Please enter your name");
+        return;
+      }
+
+      userName = userNameValue;
+
+      updateStatus("Getting media devices...");
+      log("Attempting to get user media...");
+
+      if (!await getUserMedia()) {
+        updateStatus("Failed to get media");
+
+        // Show detailed troubleshooting based on browser and context
+        const capabilities = detectBrowserCapabilities();
+        let troubleshootingMsg = "Failed to get camera/microphone access.\n\n";
+
+        if (!capabilities.secureContext) {
+          troubleshootingMsg += "🔐 SECURITY ISSUE:\n";
+          troubleshootingMsg += "• Use HTTPS for reliable media access\n";
+          troubleshootingMsg += "• Try: https://localhost:8443 or https://192.168.110.31:8443\n\n";
+        }
+
+        if (capabilities.browser === 'chrome' && navigator.userAgent.includes('Mobile')) {
+          troubleshootingMsg += "📱 CHROME MOBILE:\n";
+          troubleshootingMsg += "• HTTPS is required for camera access\n";
+          troubleshootingMsg += "• Accept the SSL certificate warning\n\n";
+        }
+
+        troubleshootingMsg += "🔧 COMMON SOLUTIONS:\n";
+        troubleshootingMsg += "1. Click 'Allow' when browser asks for permissions\n";
+        troubleshootingMsg += "2. Check camera/mic aren't used by other apps\n";
+        troubleshootingMsg += "3. Restart browser and try again\n";
+        troubleshootingMsg += "4. Check browser settings for this site\n\n";
+        troubleshootingMsg += "Check the log below for technical details.";
+
+        alert(troubleshootingMsg);
+        return;
+      }
+
+      // Tạo WebSocket connection
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const port = location.protocol === 'https:' ? '8443' : '8080';
+      const host = "192.168.110.31"; // Sử dụng hostname hiện tại (localhost hoặc IP)
+      ws = new WebSocket(`${protocol}//${host}:${port}/ws`);
+
+      ws.onopen = () => {
+        log("WebSocket connected");
+        updateStatus("Connected to server");
+        isConnected = true;
+        currentRoom = roomId;
+        updateButtons();
+
+        // Join room
+        ws.send(JSON.stringify({
+          type: "join",
+          room: roomId,
+          userName: userName
+        }));
+        log(`Joined room: ${roomId} as ${userName}`);
+      };
+
+      ws.onmessage = async (event) => {
+        const message = JSON.parse(event.data);
+        log("📨 Received message type: " + message.type);
+
+        switch (message.type) {
+          case "joined":
+            myClientId = message.clientId;
+            otherClients = message.otherClients || [];
+            log(`✅ Successfully joined room: ${message.room} as client ${myClientId}`);
+            log(`👥 Other clients in room: ${otherClients.length}`);
+            updateStatus(`Joined room: ${message.room} (${otherClients.length + 1} clients)`);
+
+            // Create peer connections for existing clients
+            for (const client of otherClients) {
+              await createPeerConnection(client.id);
+              log(`🔗 Created peer connection for client: ${client.id}`);
+            }
+            break;
+
+          case "clientJoined":
+            if (message.clientId !== myClientId) {
+              log(`👋 New client joined: ${message.clientId}`);
+              otherClients.push({ id: message.clientId });
+              await createPeerConnection(message.clientId);
+              updateStatus(`Room: ${currentRoom} (${otherClients.length + 1} clients)`);
+            }
+            break;
+
+          case "offer":
+            log(`📤 Received offer from ${message.clientId || 'unknown'}`);
+            await handleOffer(message.offer, message.clientId);
+            break;
+
+          case "answer":
+            log(`📥 Received answer from ${message.clientId || 'unknown'}`);
+            await handleAnswer(message.answer, message.clientId);
+            break;
+
+          case "candidate":
+            log(`🧭 Received ICE candidate from ${message.clientId || 'unknown'}`);
+            await handleCandidate(message.candidate, message.clientId);
+            break;
+
+          default:
+            log("⚠️ Unknown message type: " + message.type);
+            break;
+        }
+      };
+
+      ws.onclose = () => {
+        log("WebSocket disconnected");
+        updateStatus("Disconnected");
+        isConnected = false;
+        updateButtons();
+      };
+
+      ws.onerror = (error) => {
+        log("WebSocket error: " + error);
+      };
+    }
+
+    // Start call (create offers to all other clients)
+    async function startCall() {
+      if (otherClients.length === 0) {
+        log("⚠️ No other clients to call");
+        return;
+      }
+
+      log(`📞 Starting calls to ${otherClients.length} clients...`);
+
+      for (const client of otherClients) {
+        try {
+          const pc = peerConnections.get(client.id);
+          if (!pc) {
+            log(`⚠️ No peer connection for ${client.id}`);
+            continue;
+          }
+
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+
+          ws.send(JSON.stringify({
+            type: "offer",
+            offer: offer,
+            target: client.id,
+            clientId: myClientId
+          }));
+
+          log(`📤 Sent offer to ${client.id}`);
+        } catch (err) {
+          log(`Error creating offer for ${client.id}: ${err.message}`);
+        }
+      }
+    }
+
+    // Handle incoming offer
+    async function handleOffer(offer, fromClientId) {
+      const pc = peerConnections.get(fromClientId);
+      if (!pc) {
+        log(`⚠️ No peer connection for client ${fromClientId}`);
+        return;
+      }
+
+      try {
+        await pc.setRemoteDescription(offer);
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        ws.send(JSON.stringify({
+          type: "answer",
+          answer: answer,
+          target: fromClientId,
+          clientId: myClientId
+        }));
+
+        log(`📥 Sent answer to ${fromClientId}`);
+      } catch (err) {
+        log(`Error handling offer from ${fromClientId}: ${err.message}`);
+      }
+    }
+
+    // Handle incoming answer
+    async function handleAnswer(answer, fromClientId) {
+      const pc = peerConnections.get(fromClientId);
+      if (!pc) {
+        log(`⚠️ No peer connection for client ${fromClientId}`);
+        return;
+      }
+
+      try {
+        await pc.setRemoteDescription(answer);
+        log(`Set remote description (answer) from ${fromClientId}`);
+      } catch (err) {
+        log(`Error handling answer from ${fromClientId}: ${err.message}`);
+      }
+    }
+
+    // Handle incoming ICE candidate
+    async function handleCandidate(candidate, fromClientId) {
+      const pc = peerConnections.get(fromClientId);
+      if (!pc) {
+        log(`⚠️ No peer connection for client ${fromClientId}`);
+        return;
+      }
+
+      try {
+        await pc.addIceCandidate(candidate);
+        log(`Added ICE candidate from ${fromClientId}`);
+      } catch (err) {
+        log(`Error adding ICE candidate from ${fromClientId}: ${err.message}`);
+      }
+    }
+
+    // Hang up call
+    function hangUp() {
+      // Close all peer connections
+      for (const [clientId, pc] of peerConnections) {
+        pc.close();
+        log(`Closed connection to ${clientId}`);
+
+        // Remove video element
+        const videoElement = document.getElementById(`video-${clientId}`);
+        if (videoElement) {
+          videoElement.remove();
+        }
+      }
+      peerConnections.clear();
+
+      if (ws) {
+        ws.close();
+        ws = null;
+      }
+
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+
+      document.getElementById("localVideo").srcObject = null;
+      document.getElementById("remoteVideo").srcObject = null;
+
+      // Clear client data
+      isConnected = false;
+      currentRoom = null;
+      myClientId = null;
+      otherClients = [];
+
+      updateStatus("Disconnected");
+      updateButtons();
+      log("All calls ended");
+
+      // Stop recording if active
+      if (isRecording) {
+        log("🛑 Stopping recording due to hangup");
+        stopRecording();
+      }
+    }
+
+    // Composite video function
+    function setupRecordingCanvas() {
+      recordingCanvas = document.getElementById('recordingCanvas');
+      recordingContext = recordingCanvas.getContext('2d');
+
+      // Set canvas size
+      recordingCanvas.width = 1280;
+      recordingCanvas.height = 720;
+
+      return recordingCanvas;
+    }
+
+    function drawCompositeVideo() {
+      if (!recordingContext || !isRecording) return;
+
+      // Clear canvas
+      recordingContext.fillStyle = '#000000';
+      recordingContext.fillRect(0, 0, recordingCanvas.width, recordingCanvas.height);
+
+      // Get all video elements
+      const localVideo = document.getElementById('localVideo');
+      const allVideos = [];
+
+      // Add local video if available
+      if (localVideo) {
+        allVideos.push({
+          element: localVideo,
+          name: userName || 'You',
+          type: 'local'
+        });
+      }
+
+      // Add all remote videos
+      for (const [clientId, pc] of peerConnections) {
+        const remoteVideo = document.getElementById(`video-${clientId}`);
+        if (remoteVideo) {
+          allVideos.push({
+            element: remoteVideo,
+            name: `Client ${clientId.substring(0, 8)}`,
+            type: 'remote'
+          });
+        }
+      }
+
+      // Filter out videos that aren't ready and log status
+      const readyVideos = allVideos.filter(video => {
+        const el = video.element;
+        const isReady = el && el.videoWidth > 0 && el.videoHeight > 0 && !el.paused;
+
+        if (!isReady) {
+          console.log(`Video ${video.name} not ready:`, {
+            exists: !!el,
+            width: el?.videoWidth || 0,
+            height: el?.videoHeight || 0,
+            paused: el?.paused,
+            readyState: el?.readyState,
+            srcObject: !!el?.srcObject
+          });
+        }
+
+        return isReady;
+      });
+
+      console.log(`Drawing composite with ${readyVideos.length} ready videos out of ${allVideos.length} total`);
+
+      if (readyVideos.length === 0) {
+        // Draw "No Video" text with debug info
+        recordingContext.fillStyle = '#ffffff';
+        recordingContext.font = '48px Arial';
+        recordingContext.textAlign = 'center';
+        recordingContext.fillText('No Video Available', recordingCanvas.width / 2, recordingCanvas.height / 2);
+
+        recordingContext.font = '24px Arial';
+        recordingContext.fillText(`Found ${allVideos.length} video elements, 0 ready`, recordingCanvas.width / 2, recordingCanvas.height / 2 + 60);
+
+        console.log('No ready videos for recording');
+      } else if (readyVideos.length === 1) {
+        // Single video - full screen
+        const video = readyVideos[0];
+        try {
+          recordingContext.drawImage(video.element, 0, 0, recordingCanvas.width, recordingCanvas.height);
+          console.log(`Drew single video: ${video.name}`);
+        } catch (error) {
+          console.error(`Error drawing video ${video.name}:`, error);
+        }
+      } else if (readyVideos.length === 2) {
+        // Two videos - side by side
+        const video1 = readyVideos[0];
+        const video2 = readyVideos[1];
+        const halfWidth = recordingCanvas.width / 2;
+
+        try {
+          recordingContext.drawImage(video1.element, 0, 0, halfWidth, recordingCanvas.height);
+          recordingContext.drawImage(video2.element, halfWidth, 0, halfWidth, recordingCanvas.height);
+          console.log(`Drew 2 videos: ${video1.name}, ${video2.name}`);
+        } catch (error) {
+          console.error('Error drawing 2 videos:', error);
+        }
+      } else if (readyVideos.length <= 4) {
+        // 3-4 videos - 2x2 grid
+        const halfWidth = recordingCanvas.width / 2;
+        const halfHeight = recordingCanvas.height / 2;
+
+        for (let i = 0; i < Math.min(4, readyVideos.length); i++) {
+          const video = readyVideos[i];
+          const x = (i % 2) * halfWidth;
+          const y = Math.floor(i / 2) * halfHeight;
+          try {
+            recordingContext.drawImage(video.element, x, y, halfWidth, halfHeight);
+          } catch (error) {
+            console.error(`Error drawing video ${i} (${video.name}):`, error);
+          }
+        }
+        console.log(`Drew ${readyVideos.length} videos in 2x2 grid`);
+      } else {
+        // 5+ videos - 3x3 grid (max 9)
+        const thirdWidth = recordingCanvas.width / 3;
+        const thirdHeight = recordingCanvas.height / 3;
+
+        for (let i = 0; i < Math.min(9, readyVideos.length); i++) {
+          const video = readyVideos[i];
+          const x = (i % 3) * thirdWidth;
+          const y = Math.floor(i / 3) * thirdHeight;
+          try {
+            recordingContext.drawImage(video.element, x, y, thirdWidth, thirdHeight);
+          } catch (error) {
+            console.error(`Error drawing video ${i} (${video.name}):`, error);
+          }
+        }
+        console.log(`Drew ${readyVideos.length} videos in 3x3 grid`);
+      }
+
+      // Add user names overlay
+      recordingContext.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      recordingContext.fillRect(0, 0, recordingCanvas.width, 60);
+
+      recordingContext.fillStyle = '#ffffff';
+      recordingContext.font = '24px Arial';
+      recordingContext.textAlign = 'left';
+
+      let nameText = `Room: ${currentRoom} | Recording: ${readyVideos.length} participants`;
+      if (userName) nameText += ` | Recorded by: ${userName}`;
+
+      recordingContext.fillText(nameText, 20, 35);
+
+      // Continue animation
+      if (isRecording) {
+        recordingAnimationFrame = requestAnimationFrame(drawCompositeVideo);
+      }
+    }
+
+    async function startCompositeRecording() {
+      const participantCount = 1 + peerConnections.size; // local + remote
+      log(`👥 Recording ${participantCount} participant(s)`);
+
+      // For single participant, use direct stream (much more reliable)
+      if (participantCount === 1 && localStream) {
+        log("🎥 Using direct local stream for recording (single participant)");
+
+        // Verify local stream has video
+        const videoTracks = localStream.getVideoTracks();
+        const audioTracks = localStream.getAudioTracks();
+        log(`📹 Local stream: ${videoTracks.length} video, ${audioTracks.length} audio tracks`);
+
+        if (videoTracks.length > 0) {
+          log(`✅ Video track active: ${videoTracks[0].enabled}, ready: ${videoTracks[0].readyState}`);
+        }
+
+        return localStream;
+      }
+
+      // For multiple participants, use canvas composite
+      log("🎨 Using canvas composite for multiple participants");
+      return await startCanvasRecording();
+    }
+
+    async function startCanvasRecording() {
+      setupRecordingCanvas();
+
+      // Wait longer for videos to be ready
+      log("⏳ Waiting for video elements to be ready...");
+      await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second delay
+
+      // Debug all video elements
+      const localVideo = document.getElementById('localVideo');
+      log(`Local video: width=${localVideo?.videoWidth}, height=${localVideo?.videoHeight}, srcObject=${!!localVideo?.srcObject}, readyState=${localVideo?.readyState}`);
+
+      for (const [clientId, pc] of peerConnections) {
+        const remoteVideo = document.getElementById(`video-${clientId}`);
+        log(`Remote video ${clientId}: width=${remoteVideo?.videoWidth}, height=${remoteVideo?.videoHeight}, srcObject=${!!remoteVideo?.srcObject}`);
+      }
+
+      // Force video to play if paused
+      if (localVideo && localVideo.paused) {
+        try {
+          await localVideo.play();
+          log("▶️ Started local video playback");
+        } catch (error) {
+          log(`⚠️ Could not start local video: ${error.message}`);
+        }
+      }
+
+      // Start drawing composite video
+      drawCompositeVideo();
+
+      // Get stream from canvas
+      compositeStream = recordingCanvas.captureStream(30); // 30 FPS
+
+      // Add audio from local stream if available
+      if (localStream) {
+        const audioTracks = localStream.getAudioTracks();
+        audioTracks.forEach(track => {
+          compositeStream.addTrack(track);
+        });
+        log(`🎵 Added ${audioTracks.length} audio track(s) to composite stream`);
+      }
+
+      // Verify canvas stream
+      const canvasVideoTracks = compositeStream.getVideoTracks();
+      const canvasAudioTracks = compositeStream.getAudioTracks();
+      log(`🎬 Canvas stream: ${canvasVideoTracks.length} video, ${canvasAudioTracks.length} audio tracks`);
+
+      return compositeStream;
+    }
+
+    // Test canvas function
+    function testCanvas() {
+      log("🎨 Testing canvas composite...");
+
+      const canvas = document.getElementById('recordingCanvas');
+      const ctx = canvas.getContext('2d');
+
+      // Make canvas visible temporarily for testing
+      canvas.style.display = 'block';
+      canvas.style.position = 'fixed';
+      canvas.style.top = '10px';
+      canvas.style.right = '10px';
+      canvas.style.width = '320px';
+      canvas.style.height = '180px';
+      canvas.style.border = '2px solid red';
+      canvas.style.zIndex = '9999';
+
+      // Setup and draw once
+      setupRecordingCanvas();
+
+      // Draw test pattern first
+      ctx.fillStyle = '#ff0000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '48px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('CANVAS TEST', canvas.width / 2, canvas.height / 2);
+
+      // Then try to draw actual videos after 2 seconds
+      setTimeout(() => {
+        drawCompositeVideo();
+        log("🎨 Canvas test completed - check top-right corner");
+
+        // Hide canvas after 10 seconds
+        setTimeout(() => {
+          canvas.style.display = 'none';
+        }, 10000);
+      }, 2000);
+    }
+
+    // Test direct recording function
+    async function testDirectRecording() {
+      log("🎥 Testing direct stream recording...");
+
+      // Check local video element first
+      const localVideo = document.getElementById('localVideo');
+      log(`📺 Local video element: exists=${!!localVideo}, width=${localVideo?.videoWidth}, height=${localVideo?.videoHeight}`);
+      log(`📺 Video element srcObject: ${!!localVideo?.srcObject}`);
+
+      if (!localStream) {
+        log("❌ No local stream available");
+
+        // Try to get stream from video element
+        if (localVideo && localVideo.srcObject) {
+          log("🔄 Trying to use stream from video element...");
+          const streamFromVideo = localVideo.srcObject;
+          const videoTracks = streamFromVideo.getVideoTracks();
+          const audioTracks = streamFromVideo.getAudioTracks();
+          log(`📹 Video element stream: ${videoTracks.length} video, ${audioTracks.length} audio tracks`);
+          return;
+        }
+        return;
+      }
+
+      // Log stream details
+      const videoTracks = localStream.getVideoTracks();
+      const audioTracks = localStream.getAudioTracks();
+      log(`📹 LocalStream tracks: ${videoTracks.length} video, ${audioTracks.length} audio`);
+
+      if (videoTracks.length > 0) {
+        const track = videoTracks[0];
+        log(`📹 Video track: enabled=${track.enabled}, muted=${track.muted}, readyState=${track.readyState}`);
+        log(`📹 Video track kind: ${track.kind}, label: ${track.label}`);
+
+        const settings = track.getSettings();
+        log(`📹 Video settings: width=${settings.width}, height=${settings.height}, frameRate=${settings.frameRate}`);
+      } else {
+        log("❌ No video tracks found in localStream!");
+      }
+
+      // Test with both localStream and video element stream
+      const streamsToTest = [
+        { name: 'localStream', stream: localStream },
+        { name: 'videoElementStream', stream: localVideo?.srcObject }
+      ];
+
+      for (const { name, stream } of streamsToTest) {
+        if (!stream) {
+          log(`⚠️ ${name} not available`);
+          continue;
+        }
+
+        log(`🧪 Testing ${name}...`);
+
+        try {
+          const testRecorder = new MediaRecorder(stream);
+          const testChunks = [];
+
+          testRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              testChunks.push(event.data);
+              log(`📦 ${name} chunk: ${event.data.size} bytes`);
+            }
+          };
+
+          testRecorder.onstop = () => {
+            const blob = new Blob(testChunks, { type: 'video/webm' });
+            log(`✅ ${name} recording complete: ${blob.size} bytes`);
+
+            // Create test download
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `test-${name}-recording.webm`;
+            a.click();
+            URL.revokeObjectURL(url);
+            log(`💾 Downloaded ${name} test recording`);
+          };
+
+          testRecorder.start();
+          log(`🎬 Started ${name} test recording...`);
+
+          // Stop after 3 seconds
+          setTimeout(() => {
+            testRecorder.stop();
+            log(`⏹️ Stopped ${name} test recording`);
+          }, 3000 + streamsToTest.indexOf({ name, stream }) * 1000); // Stagger the tests
+
+        } catch (error) {
+          log(`❌ ${name} test recording failed: ${error.message}`);
+        }
+      }
+    }
+
+    // Test local download (bypass server)
+    async function testLocalDownload() {
+      log("💾 Testing local download recording...");
+
+      const localVideo = document.getElementById('localVideo');
+      if (!localVideo || !localVideo.srcObject) {
+        log("❌ No local video available. Please join room and start call first.");
+        return;
+      }
+
+      const stream = localVideo.srcObject;
+      const videoTracks = stream.getVideoTracks();
+      const audioTracks = stream.getAudioTracks();
+      log(`📹 Stream: ${videoTracks.length} video, ${audioTracks.length} audio tracks`);
+
+      if (videoTracks.length === 0) {
+        log("❌ No video tracks in stream!");
+        return;
+      }
+
+      try {
+        // Test different mime types
+        const mimeTypes = [
+          'video/webm;codecs=vp9,opus',
+          'video/webm;codecs=vp8,opus',
+          'video/webm',
+          'video/mp4'
+        ];
+
+        let selectedMimeType = '';
+        for (const mimeType of mimeTypes) {
+          if (MediaRecorder.isTypeSupported(mimeType)) {
+            selectedMimeType = mimeType;
+            log(`✅ Using mime type: ${mimeType}`);
+            break;
+          }
+        }
+
+        if (!selectedMimeType) {
+          log("⚠️ No supported mime type found, using default");
+        }
+
+        const recorder = new MediaRecorder(stream, selectedMimeType ? { mimeType: selectedMimeType } : {});
+        const chunks = [];
+
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            chunks.push(event.data);
+            log(`📦 Chunk: ${event.data.size} bytes`);
+          }
+        };
+
+        recorder.onstop = () => {
+          const blob = new Blob(chunks, { type: selectedMimeType || 'video/webm' });
+          log(`✅ Recording complete: ${blob.size} bytes`);
+
+          // Create download
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `test-local-${Date.now()}.webm`;
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          log(`💾 Downloaded: ${a.download}`);
+        };
+
+        recorder.onerror = (event) => {
+          log(`❌ Recording error: ${event.error}`);
+        };
+
+        recorder.start(1000); // Collect data every second
+        log("🎬 Started local test recording (5 seconds)...");
+
+        // Stop after 5 seconds
+        setTimeout(() => {
+          recorder.stop();
+          log("⏹️ Stopped local test recording");
+        }, 5000);
+
+      } catch (error) {
+        log(`❌ Local test failed: ${error.message}`);
+      }
+    }
+
+    function stopCompositeRecording() {
+      if (recordingAnimationFrame) {
+        cancelAnimationFrame(recordingAnimationFrame);
+        recordingAnimationFrame = null;
+      }
+
+      if (compositeStream) {
+        compositeStream.getTracks().forEach(track => track.stop());
+        compositeStream = null;
+      }
+    }
+
+    // Recording functions
+    async function startRecording() {
+      if (!isConnected) {
+        log("❌ Must join a room before recording");
+        return;
+      }
+
+      if (isRecording) {
+        log("⚠️ Recording already in progress");
+        return;
+      }
+
+      try {
+        // Check if MediaRecorder is supported
+        if (!window.MediaRecorder) {
+          log("❌ MediaRecorder API not supported in this browser");
+          return;
+        }
+
+        // Start composite recording to get all video streams
+        const streamToRecord = await startCompositeRecording();
+
+        if (!streamToRecord) {
+          log("❌ Failed to create composite stream for recording");
+          return;
+        }
+
+        // Reset recorded chunks
+        recordedChunks = [];
+
+        // Create MediaRecorder with the composite stream
+        const options = {
+          mimeType: 'video/webm;codecs=vp9,opus'
+        };
+
+        // Try different mime types for compatibility
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+          if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {
+            options.mimeType = 'video/webm;codecs=vp8,opus';
+          } else if (MediaRecorder.isTypeSupported('video/webm')) {
+            options.mimeType = 'video/webm';
+          } else if (MediaRecorder.isTypeSupported('video/mp4')) {
+            options.mimeType = 'video/mp4';
+          } else {
+            delete options.mimeType; // Let browser choose
+          }
+        }
+
+        mediaRecorder = new MediaRecorder(streamToRecord, options);
+
+        // Handle data available event
+        mediaRecorder.ondataavailable = function (event) {
+          if (event.data && event.data.size > 0) {
+            recordedChunks.push(event.data);
+            log(`📹 Recorded chunk: ${event.data.size} bytes`);
+          }
+        };
+
+        // Handle recording stop event
+        mediaRecorder.onstop = function () {
+          log("📹 Recording stopped, uploading to server...");
+          uploadRecording();
+        };
+
+        // Handle errors
+        mediaRecorder.onerror = function (event) {
+          log(`❌ Recording error: ${event.error}`);
+          isRecording = false;
+          updateRecordingStatus("❌ Recording Error");
+          updateButtons();
+        };
+
+        // Start recording
+        mediaRecorder.start(1000); // Collect data every second
+        isRecording = true;
+        recordingStartTime = Date.now();
+
+        // Start timer
+        recordingTimer = setInterval(updateRecordingTimer, 1000);
+
+        updateRecordingStatus("🔴 Recording...", true);
+        updateButtons();
+
+        // Count participants for logging
+        const participantCount = 1 + peerConnections.size; // local + remote
+        log(`🎬 Started composite recording (${options.mimeType || 'default format'})`);
+        log(`👥 Recording ${participantCount} participant(s) in room ${currentRoom}`);
+
+      } catch (error) {
+        log(`❌ Failed to start recording: ${error.message}`);
+        isRecording = false;
+        stopCompositeRecording();
+        updateRecordingStatus("❌ Recording Error");
+        updateButtons();
+      }
+    }
+
+    function stopRecording() {
+      if (!isRecording || !mediaRecorder) {
+        log("⚠️ No active recording to stop");
+        return;
+      }
+
+      try {
+        mediaRecorder.stop();
+        isRecording = false;
+        recordingStartTime = null;
+
+        // Clear timer
+        if (recordingTimer) {
+          clearInterval(recordingTimer);
+          recordingTimer = null;
+        }
+
+        updateRecordingStatus("⏹️ Processing...");
+        updateButtons();
+        log("⏹️ Stopping composite recording...");
+
+        // Stop composite recording
+        stopCompositeRecording();
+
+      } catch (error) {
+        log(`❌ Failed to stop recording: ${error.message}`);
+        isRecording = false;
+        stopCompositeRecording();
+        updateRecordingStatus("❌ Recording Error");
+        updateButtons();
+      }
+    }
+
+    async function uploadRecording() {
+      if (recordedChunks.length === 0) {
+        log("❌ No recorded data to upload");
+        updateRecordingStatus("⏹️ Not Recording");
+        return;
+      }
+
+      try {
+        updateRecordingStatus("📤 Uploading...");
+
+        // Create blob from recorded chunks
+        const blob = new Blob(recordedChunks, {
+          type: mediaRecorder.mimeType || 'video/webm'
+        });
+
+        // Generate filename with timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const extension = mediaRecorder.mimeType?.includes('mp4') ? 'mp4' : 'webm';
+        const filename = `recording-${timestamp}.${extension}`;
+
+        // Create FormData for upload
+        const formData = new FormData();
+        formData.append('recording', blob, filename);
+        formData.append('room', currentRoom);
+        formData.append('userName', userName);
+        formData.append('clientId', myClientId);
+
+        // Upload to server
+        const protocol = location.protocol === 'https:' ? 'https:' : 'http:';
+        const port = location.protocol === 'https:' ? '8443' : '8080';
+        const uploadUrl = `${protocol}//${location.hostname}:${port}/upload-recording`;
+
+        const response = await fetch(uploadUrl, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        const fileSize = (blob.size / 1024 / 1024).toFixed(2);
+        log(`💾 Recording uploaded successfully: ${result.filename} (${fileSize} MB)`);
+        log(`📁 Saved to: static/recordings/${currentRoom}/${result.filename}`);
+        updateRecordingStatus("✅ Uploaded to Server");
+
+        // Reset after 3 seconds
+        setTimeout(() => {
+          updateRecordingStatus("⏹️ Not Recording");
+        }, 3000);
+
+      } catch (error) {
+        log(`❌ Failed to upload recording: ${error.message}`);
+        updateRecordingStatus("❌ Upload Error");
+
+        // Fallback: offer local download
+        log("🔄 Offering local download as fallback...");
+        downloadRecordingFallback();
+      }
+    }
+
+    function downloadRecordingFallback() {
+      if (recordedChunks.length === 0) return;
+
+      try {
+        // Create blob from recorded chunks
+        const blob = new Blob(recordedChunks, {
+          type: mediaRecorder.mimeType || 'video/webm'
+        });
+
+        // Create download URL
+        const url = URL.createObjectURL(blob);
+
+        // Create download link
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+
+        // Generate filename with timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const extension = mediaRecorder.mimeType?.includes('mp4') ? 'mp4' : 'webm';
+        a.download = `webrtc-recording-${timestamp}.${extension}`;
+
+        // Trigger download
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        // Clean up
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+        }, 1000);
+
+        const fileSize = (blob.size / 1024 / 1024).toFixed(2);
+        log(`💾 Downloaded recording locally: ${a.download} (${fileSize} MB)`);
+        updateRecordingStatus("✅ Downloaded Locally");
+
+        // Reset after 3 seconds
+        setTimeout(() => {
+          updateRecordingStatus("⏹️ Not Recording");
+        }, 3000);
+
+      } catch (error) {
+        log(`❌ Failed to download recording: ${error.message}`);
+        updateRecordingStatus("❌ Download Error");
+      }
+    }
+
+    // Test WebRTC support
+    async function testWebRTC() {
+      log("🧪 Testing WebRTC support...");
+
+      try {
+        // Test 1: Check RTCPeerConnection
+        if (typeof RTCPeerConnection === 'undefined') {
+          log("❌ RTCPeerConnection is not supported");
+
+          // Try prefixed versions
+          window.RTCPeerConnection = window.RTCPeerConnection ||
+            window.webkitRTCPeerConnection ||
+            window.mozRTCPeerConnection;
+
+          if (typeof RTCPeerConnection === 'undefined') {
+            throw new Error("RTCPeerConnection is not available in this browser");
+          } else {
+            log("✅ RTCPeerConnection available (prefixed)");
+          }
+        } else {
+          log("✅ RTCPeerConnection is supported");
+        }
+
+        // Test 2: Check WebSocket
+        if (typeof WebSocket === 'undefined') {
+          log("❌ WebSocket is not supported");
+          throw new Error("WebSocket is not available in this browser");
+        } else {
+          log("✅ WebSocket is supported");
+        }
+
+        // Test 3: Check getUserMedia
+        const isSecureContext = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '192.168.110.31';
+        log("✅ Secure context: " + isSecureContext);
+
+        if (!navigator.mediaDevices && !navigator.getUserMedia && !navigator.webkitGetUserMedia && !navigator.mozGetUserMedia) {
+          log("❌ getUserMedia is not supported");
+          throw new Error("getUserMedia is not available");
+        } else {
+          log("✅ getUserMedia is available");
+        }
+
+        // Test 4: Try creating PeerConnection
+        try {
+          const testPC = new RTCPeerConnection({
+            iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+          });
+          log("✅ Can create RTCPeerConnection");
+          testPC.close();
+        } catch (e) {
+          log("❌ Error creating RTCPeerConnection: " + e.message);
+          throw e;
+        }
+
+        // Test 5: Basic media test
+        try {
+          log("🎥 Testing media access...");
+
+          let stream;
+          if (!navigator.mediaDevices) {
+            // Use legacy API
+            navigator.getUserMedia = navigator.getUserMedia ||
+              navigator.webkitGetUserMedia ||
+              navigator.mozGetUserMedia ||
+              navigator.msGetUserMedia;
+
+            if (navigator.getUserMedia) {
+              const getUserMediaPromise = function (constraints) {
+                return new Promise(function (resolve, reject) {
+                  navigator.getUserMedia.call(navigator, constraints, resolve, reject);
+                });
+              };
+
+              stream = await getUserMediaPromise({ video: true, audio: true });
+              log("✅ Camera and microphone access works! (legacy API)");
+            } else {
+              throw new Error("No getUserMedia API available");
+            }
+          } else {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            log("✅ Camera and microphone access works!");
+          }
+
+          if (stream) {
+            const videoTracks = stream.getVideoTracks();
+            const audioTracks = stream.getAudioTracks();
+            log(`📹 Video tracks: ${videoTracks.length}`);
+            log(`🎤 Audio tracks: ${audioTracks.length}`);
+
+            stream.getTracks().forEach(track => track.stop());
+          }
+
+        } catch (e) {
+          log("⚠️ Media access failed: " + e.message);
+          if (!isSecureContext) {
+            log("💡 Try HTTPS for better WebRTC support");
+          } else {
+            log("This might be due to permissions or device availability");
+          }
+        }
+
+        log("🎉 WebRTC test completed successfully!");
+
+      } catch (err) {
+        log("❌ WebRTC test failed: " + err.message);
+        log("");
+        log("🔧 Troubleshooting:");
+        log("1. Use a modern browser (Chrome, Firefox, Safari, Edge)");
+        log("2. Update your browser to the latest version");
+        log("3. Use HTTPS: https://localhost:8443 or https://192.168.110.31:8443");
+        log("4. Allow camera/microphone permissions");
+        log("5. Check if WebRTC is enabled in browser settings");
+      }
+    }
+
+    // Test network connection
+    async function testConnection() {
+      log("🌐 Testing network connection...");
+
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const port = location.protocol === 'https:' ? '8443' : '8080';
+      const host = location.hostname;
+
+      log(`📍 Current location: ${location.href}`);
+      log(`🔗 WebSocket URL: ${protocol}//${host}:${port}/ws`);
+
+      try {
+        // Test WebSocket connection
+        log("🔌 Testing WebSocket connection...");
+        const testWs = new WebSocket(`${protocol}//${host}:${port}/ws`);
+
+        testWs.onopen = () => {
+          log("✅ WebSocket connection successful!");
+
+          // Test room join
+          testWs.send(JSON.stringify({
+            type: "join",
+            room: "test-room-" + Date.now()
+          }));
+
+          setTimeout(() => {
+            testWs.close();
+            log("🔌 Test WebSocket closed");
+          }, 2000);
+        };
+
+        testWs.onmessage = (event) => {
+          const message = JSON.parse(event.data);
+          log("📨 Test message received: " + JSON.stringify(message));
+        };
+
+        testWs.onerror = (error) => {
+          log("❌ WebSocket test error: " + error);
+        };
+
+        testWs.onclose = (event) => {
+          log(`🔌 WebSocket test closed: code=${event.code}, reason=${event.reason}`);
+        };
+
+        // Timeout after 5 seconds
+        setTimeout(() => {
+          if (testWs.readyState === WebSocket.CONNECTING) {
+            testWs.close();
+            log("⏰ WebSocket test timeout - connection failed");
+            log("💡 Troubleshooting:");
+            log("  1. Check if server is running");
+            log("  2. Check firewall settings");
+            log("  3. Make sure you're on the same network");
+            log("  4. Try different port (8080 vs 8443)");
+          }
+        }, 5000);
+
+      } catch (err) {
+        log("❌ Network test failed: " + err.message);
+      }
+    }
+
+    // Test media permissions step by step
+    async function testMediaPermissions() {
+      log("🎥 Testing media permissions step by step...");
+
+      const capabilities = detectBrowserCapabilities();
+      log(`🔍 Browser: ${capabilities.browser} ${capabilities.version}`);
+      log(`🔒 Secure context: ${capabilities.secureContext}`);
+      log(`📍 Current URL: ${location.href}`);
+
+      // Step 1: Check if APIs exist
+      log("\n📋 Step 1: Checking API availability...");
+
+      if (!capabilities.getUserMedia) {
+        log("❌ No getUserMedia API found");
+        log("💡 Try updating your browser or use Chrome/Firefox/Safari");
+        return;
+      }
+      log("✅ getUserMedia API is available");
+
+      // Step 2: Check secure context for modern browsers
+      if (capabilities.browser === 'chrome' && !capabilities.secureContext) {
+        log("\n⚠️ Step 2: Security Context Issue");
+        log("Chrome requires HTTPS for camera/microphone access");
+        log("🔧 Solutions:");
+        log("  • Use: https://localhost:8443");
+        log("  • Or: https://192.168.110.31:8443");
+        log("  • Or: https://192.168.0.129:8443");
+        return;
+      }
+
+      // Step 3: Test permissions query (if supported)
+      log("\n🔐 Step 3: Checking permissions...");
+      if (navigator.permissions) {
+        try {
+          const cameraPermission = await navigator.permissions.query({ name: 'camera' });
+          const micPermission = await navigator.permissions.query({ name: 'microphone' });
+
+          log(`📹 Camera permission: ${cameraPermission.state}`);
+          log(`🎤 Microphone permission: ${micPermission.state}`);
+
+          if (cameraPermission.state === 'denied' || micPermission.state === 'denied') {
+            log("❌ Permissions are denied");
+            log("🔧 Go to browser settings and allow camera/microphone for this site");
+            return;
+          }
+        } catch (e) {
+          log("⚠️ Cannot check permissions (not supported)");
+        }
+      }
+
+      // Step 4: Test media access with different constraints
+      log("\n🎥 Step 4: Testing media access...");
+
+      const testConstraints = [
+        { video: true, audio: true },
+        { video: true, audio: false },
+        { video: false, audio: true },
+        { video: { width: 640, height: 480 }, audio: true },
+        { video: { facingMode: "user" }, audio: true }
+      ];
+
+      for (let i = 0; i < testConstraints.length; i++) {
+        const constraints = testConstraints[i];
+        log(`\n🧪 Test ${i + 1}: ${JSON.stringify(constraints)}`);
+
+        try {
+          let stream;
+
+          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+          } else {
+            // Fallback to legacy API
+            const getUserMediaPromise = function (constraints) {
+              return new Promise(function (resolve, reject) {
+                const getUserMedia = navigator.getUserMedia ||
+                  navigator.webkitGetUserMedia ||
+                  navigator.mozGetUserMedia ||
+                  navigator.msGetUserMedia;
+                getUserMedia.call(navigator, constraints, resolve, reject);
+              });
+            };
+            stream = await getUserMediaPromise(constraints);
+          }
+
+          if (stream) {
+            const videoTracks = stream.getVideoTracks();
+            const audioTracks = stream.getAudioTracks();
+
+            log(`✅ Success! Video tracks: ${videoTracks.length}, Audio tracks: ${audioTracks.length}`);
+
+            if (videoTracks.length > 0) {
+              const videoSettings = videoTracks[0].getSettings();
+              log(`📹 Video: ${videoSettings.width}x${videoSettings.height} @ ${videoSettings.frameRate}fps`);
+            }
+
+            if (audioTracks.length > 0) {
+              const audioSettings = audioTracks[0].getSettings();
+              log(`🎤 Audio: ${audioSettings.sampleRate}Hz, ${audioSettings.channelCount} channels`);
+            }
+
+            // Clean up
+            stream.getTracks().forEach(track => track.stop());
+
+            log("\n🎉 Media access test completed successfully!");
+            log("✅ Your camera and microphone are working correctly");
+            return;
+          }
+
+        } catch (error) {
+          log(`❌ Test ${i + 1} failed: ${error.name} - ${error.message}`);
+
+          if (error.name === 'NotAllowedError') {
+            log("🔧 Permission denied - click 'Allow' when browser asks");
+          } else if (error.name === 'NotFoundError') {
+            log("🔧 No camera/microphone found - check device connections");
+          } else if (error.name === 'NotReadableError') {
+            log("🔧 Device in use - close other apps using camera/microphone");
+          }
+
+          continue; // Try next constraint
+        }
+      }
+
+      log("\n❌ All media access tests failed");
+      log("🔧 Final troubleshooting steps:");
+      log("1. Restart your browser completely");
+      log("2. Check system camera/microphone settings");
+      log("3. Try a different browser");
+      log("4. Ensure no other apps are using the devices");
+    }
+
+    // Initialize
+    updateButtons();
+    log("WebRTC Video Call Demo initialized");
+    log("💡 Click 'Test Media' to debug camera/microphone issues");
+    log("💡 Click 'Test Network' to check connectivity");
+    log("💡 Click 'Test WebRTC' to check browser compatibility");
+  </script>
+</body>
+
+</html>

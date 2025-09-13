@@ -1,0 +1,131 @@
+async function joinRoom() {
+    const roomId = document.getElementById("roomInput").value.trim();
+    const userNameValue = document.getElementById("userNameInput").value.trim();
+    
+    if (!roomId) {
+      alert("Please enter a room ID");
+      return;
+    }
+    
+    if (!userNameValue) {
+      alert("Please enter your name");
+      return;
+    }
+    
+    userName = userNameValue;
+
+    updateStatus("Getting media devices...");
+    log("Attempting to get user media...");
+
+    if (!await getUserMedia()) {
+      updateStatus("Failed to get media");
+      
+      // Show detailed troubleshooting based on browser and context
+      const capabilities = detectBrowserCapabilities();
+      let troubleshootingMsg = "Failed to get camera/microphone access.\n\n";
+      
+      if (!capabilities.secureContext) {
+        troubleshootingMsg += "🔐 SECURITY ISSUE:\n";
+        troubleshootingMsg += "• Use HTTPS for reliable media access\n";
+        troubleshootingMsg += "• Try: https://localhost:8443 or https://192.168.110.31:8443\n\n";
+      }
+      
+      if (capabilities.browser === 'chrome' && navigator.userAgent.includes('Mobile')) {
+        troubleshootingMsg += "📱 CHROME MOBILE:\n";
+        troubleshootingMsg += "• HTTPS is required for camera access\n";
+        troubleshootingMsg += "• Accept the SSL certificate warning\n\n";
+      }
+      
+      troubleshootingMsg += "🔧 COMMON SOLUTIONS:\n";
+      troubleshootingMsg += "1. Click 'Allow' when browser asks for permissions\n";
+      troubleshootingMsg += "2. Check camera/mic aren't used by other apps\n";
+      troubleshootingMsg += "3. Restart browser and try again\n";
+      troubleshootingMsg += "4. Check browser settings for this site\n\n";
+      troubleshootingMsg += "Check the log below for technical details.";
+      
+      alert(troubleshootingMsg);
+      return;
+    }
+
+    // Tạo WebSocket connection
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const port = location.protocol === 'https:' ? '8443' : '8080';
+    const host = location.hostname; // Sử dụng hostname hiện tại (localhost hoặc IP)
+    ws = new WebSocket(`${protocol}//${host}:${port}/ws`);
+
+ws.onopen = () => {
+      log("WebSocket connected");
+      updateStatus("Connected to server");
+      isConnected = true;
+      currentRoom = roomId;
+      updateButtons();
+      
+      // Join room
+      ws.send(JSON.stringify({
+        type: "join",
+        room: roomId,
+        userName: userName
+      }));
+      log(`Joined room: ${roomId} as ${userName}`);
+    };
+
+    ws.onmessage = async (event) => {
+      const message = JSON.parse(event.data);
+      log("📨 Received message type: " + message.type);
+      
+      switch (message.type) {
+        case "joined":
+          myClientId = message.clientId;
+          otherClients = message.otherClients || [];
+          log(`✅ Successfully joined room: ${message.room} as client ${myClientId}`);
+          log(`👥 Other clients in room: ${otherClients.length}`);
+          updateStatus(`Joined room: ${message.room} (${otherClients.length + 1} clients)`);
+          
+          // Create peer connections for existing clients
+          for (const client of otherClients) {
+            await createPeerConnection(client.id);
+            log(`🔗 Created peer connection for client: ${client.id}`);
+          }
+          break;
+          
+        case "clientJoined":
+          if (message.clientId !== myClientId) {
+            log(`👋 New client joined: ${message.clientId}`);
+            otherClients.push({id: message.clientId});
+            await createPeerConnection(message.clientId);
+            updateStatus(`Room: ${currentRoom} (${otherClients.length + 1} clients)`);
+          }
+          break;
+          
+        case "offer":
+          log(`📤 Received offer from ${message.clientId || 'unknown'}`);
+          await handleOffer(message.offer, message.clientId);
+          break;
+          
+        case "answer":
+          log(`📥 Received answer from ${message.clientId || 'unknown'}`);
+          await handleAnswer(message.answer, message.clientId);
+          break;
+          
+        case "candidate":
+          log(`🧭 Received ICE candidate from ${message.clientId || 'unknown'}`);
+          await handleCandidate(message.candidate, message.clientId);
+          break;
+          
+        default:
+          log("⚠️ Unknown message type: " + message.type);
+          break;
+      }
+    };
+
+    ws.onclose = () => {
+      log("WebSocket disconnected");
+      updateStatus("Disconnected");
+      isConnected = false;
+      updateButtons();
+    };
+
+    ws.onerror = (error) => {
+      log("WebSocket error: " + error);
+    };
+  }
