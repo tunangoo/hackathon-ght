@@ -66,14 +66,24 @@ export default function Home() {
       
       if (isLoginMode) {
         result = await login(data.username, data.password)
+        
+        if (result.success) {
+          router.push("/meetings")
+        } else {
+          setError(result.error || "Login failed")
+        }
       } else {
         result = await registerUser(data.username, data.password)
-      }
-      
-      if (result.success) {
-        router.push("/meetings")
-      } else {
-        setError(result.error || (isLoginMode ? "Login failed" : "Registration failed"))
+        
+        if (result.success) {
+          // Switch to login mode after successful registration
+          setIsLoginMode(true)
+          reset()
+          // Show success message
+          setError("Registration successful! Please sign in with your credentials.")
+        } else {
+          setError(result.error || "Registration failed")
+        }
       }
     } catch (error) {
       setError("An unexpected error occurred")
@@ -109,9 +119,13 @@ export default function Home() {
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)}>
             <div className="flex flex-col gap-6">
-              {/* Error message */}
+              {/* Error/Success message */}
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+                <div className={`px-4 py-3 rounded-md text-sm ${
+                  error.includes("successful") 
+                    ? "bg-green-50 border border-green-200 text-green-700" 
+                    : "bg-red-50 border border-red-200 text-red-700"
+                }`}>
                   {error}
                 </div>
               )}

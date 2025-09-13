@@ -108,17 +108,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: data.message || data.error || 'Registration failed' }
       }
 
-      // Create user object from API response
-      const user: User = {
-        id: data.id || data.userId || Date.now().toString(),
-        username: data.username || username,
-        avatar: username.charAt(0).toUpperCase()
-      }
-
-      // Store user data
-      setUser(user)
-      localStorage.setItem('user', JSON.stringify(user))
-      
+      // Registration successful - don't auto-login
+      // Just return success without setting user data
       return { success: true }
     } catch (error) {
       console.error('Registration error:', error)
