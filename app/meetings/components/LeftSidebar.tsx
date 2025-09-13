@@ -95,6 +95,7 @@ export default function LeftSidebar() {
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string | number | null>(null);
   const { user, logout } = useAuth();
   const router = useRouter();
 
@@ -103,9 +104,42 @@ export default function LeftSidebar() {
     router.push("/");
   };
 
+  // Format time with UTC+7 timezone
+  const formatTime = (createdAt: string) => {
+    const now = new Date();
+    const meetingTime = new Date(createdAt);
+    
+    // Convert to UTC+7 (Vietnam timezone)
+    const vietnamTime = new Date(meetingTime.getTime() + (7 * 60 * 60 * 1000));
+    const nowVietnam = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+    
+    const diffInMinutes = Math.floor((nowVietnam.getTime() - vietnamTime.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) {
+      return "Just now";
+    } else if (diffInMinutes < 60) {
+      return `${diffInMinutes}m ago`;
+    } else if (diffInMinutes < 1440) { // 24 hours
+      const hours = Math.floor(diffInMinutes / 60);
+      return `${hours}h ago`;
+    } else if (diffInMinutes < 10080) { // 7 days
+      const days = Math.floor(diffInMinutes / 1440);
+      return `${days}d ago`;
+    } else {
+      return vietnamTime.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: vietnamTime.getFullYear() !== nowVietnam.getFullYear() ? 'numeric' : undefined
+      });
+    }
+  };
+
   const handleMeetingClick = (meeting: Meeting) => {
     console.log('Meeting clicked:', meeting);
     console.log('Video URL:', meeting.video_url || meeting.videoUrl);
+    
+    // Set selected meeting for highlighting
+    setSelectedMeetingId(meeting.id);
     
     // Load video URL in the current page instead of navigating
     if (meeting.video_url || meeting.videoUrl) {
@@ -164,7 +198,7 @@ export default function LeftSidebar() {
           id: meeting.id || index + 1,
           name: meeting.title || `Meeting ${index + 1}`,
           lastMessage: "Meeting recording available",
-          time: meeting.created_at ? new Date(meeting.created_at).toLocaleDateString() : "Recently",
+          time: meeting.created_at ? formatTime(meeting.created_at) : "Recently",
           tags: ["Recording"],
           avatar: (meeting.title || `M${index + 1}`).charAt(0).toUpperCase(),
           videoUrl: meeting.video_url,
@@ -175,6 +209,32 @@ export default function LeftSidebar() {
           created_at: meeting.created_at,
           updated_at: meeting.updated_at
         })) : [];
+
+        // Sort meetings by created_at (most recent first)
+        transformedMeetings.sort((a, b) => {
+          if (!a.created_at || !b.created_at) return 0;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+
+        // Set the first meeting as selected by default
+        if (transformedMeetings.length > 0) {
+          setSelectedMeetingId(transformedMeetings[0].id);
+          // Auto-load the first meeting's video
+          const firstMeeting = transformedMeetings[0];
+          if (firstMeeting.video_url || firstMeeting.videoUrl) {
+            localStorage.setItem('selectedVideoUrl', firstMeeting.video_url || firstMeeting.videoUrl || '');
+            localStorage.setItem('selectedMeetingTitle', firstMeeting.name);
+            
+            // Trigger a custom event that parent can listen to
+            window.dispatchEvent(new CustomEvent('meetingSelected', {
+              detail: {
+                meeting: firstMeeting,
+                videoUrl: firstMeeting.video_url || firstMeeting.videoUrl,
+                title: firstMeeting.name
+              }
+            }));
+          }
+        }
 
         console.log('Transformed meetings:', transformedMeetings);
         setMeetings(transformedMeetings);
@@ -307,7 +367,11 @@ export default function LeftSidebar() {
               meetings.map((meeting) => (
                 <Card 
                   key={meeting.id} 
-                  className="p-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                  className={`p-3 cursor-pointer transition-colors ${
+                    selectedMeetingId === meeting.id 
+                      ? 'bg-purple-50 border-purple-200 shadow-sm' 
+                      : 'hover:bg-gray-50'
+                  }`}
                   onClick={() => handleMeetingClick(meeting)}
                 >
                   <div className="flex gap-3">
